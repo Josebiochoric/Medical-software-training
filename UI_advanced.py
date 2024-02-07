@@ -57,7 +57,7 @@ class MainWindow(QMainWindow):
         gridLayout.addWidget(detectedTempFrame, 1, 0)
 
         # INDe Status section
-        indeStatusFrame = self.createFrame("INDe Status", "OK!\nNo Purging")
+        indeStatusFrame = self.createFrame("INDe Status", "OK!\nNo Problem")
         gridLayout.addWidget(indeStatusFrame, 1, 1)
 
         # Approx. Heart Temp section

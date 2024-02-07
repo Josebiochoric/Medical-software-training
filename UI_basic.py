@@ -1,97 +1,103 @@
+
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel
-from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QProgressBar
 from PyQt5.QtCore import QTimer
 
-class UI(QWidget):
+class TemperatureControlGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Simple UI')
-
-        self.button1 = QPushButton('Cool Down', self)
-        self.button1.setStyleSheet("background-color: blue;")
-        self.button1.clicked.connect(self.cool_down)
-
-        self.button2 = QPushButton('Warm Up', self)
-        self.button2.setStyleSheet("background-color: red;")
-        self.button2.clicked.connect(self.warm_up)
-
-        self.button3 = QPushButton('Set for Transport', self)
-        self.button3.setStyleSheet("background-color: green;")
-        self.button3.clicked.connect(self.set_for_transport)
-
-        self.temperature_label = QLabel('20', self)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.button1)
-        layout.addWidget(self.button2)
-        layout.addWidget(self.button3)
-        layout.addWidget(self.temperature_label)
-
-        self.setLayout(layout)
+        self.initUI()
+        
+    def initUI(self):
+        self.setWindowTitle('Temperature Control')
         self.setGeometry(300, 300, 300, 200)
-        self.show()
 
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_temperature)
+        # Set up the layout
+        self.layout = QVBoxLayout()
 
-    def cool_down(self):
-        # Stop warm_up function if running
-        if hasattr(self, 'timer'):
-            self.timer.stop()
+        # Progress bar for self-test
+        self.progressBar = QProgressBar(self)
+        self.progressBar.setMaximum(100)
+        self.layout.addWidget(self.progressBar)
 
-        # Implement cool_down functionality here
-        print("Cooling down...")
-        self.timer.start(1000)  # Update every 1 second
+        # Timer for self-test simulation
+        self.selfTestTimer = QTimer(self)
+        self.selfTestTimer.timeout.connect(self.performSelfTest)
+        self.selfTestTimer.start(50)  # Update self-test progress every 50 ms
 
-    def warm_up(self):
-        # Stop cool_down function if running
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-
-        # Implement warm_up functionality here
-        print("Warming up...")
-        self.timer.start(1000)  # Update every 1 second
-
-    def set_for_transport(self):
-        # Stop both cool_down and warm_up functions if running
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-
-        # Implement set_for_transport functionality here
-        print("Setting for transport...")
-        self.temperature_label.setText('20')
-
-    def update_temperature(self):
-        current_temperature = int(self.temperature_label.text())
-        if current_temperature > -4:
-            new_temperature = current_temperature - 1
+        # Set the layout
+        self.setLayout(self.layout)
+        
+    def performSelfTest(self):
+        value = self.progressBar.value() + 5
+        self.progressBar.setValue(value)
+        if value >= 100:
+            self.selfTestTimer.stop()
+            self.startMainUI()
+        
+    def startMainUI(self):
+        # Remove the progress bar from the layout
+        self.layout.removeWidget(self.progressBar)
+        self.progressBar.deleteLater()
+        self.progressBar = None
+        
+        # Now set up the main UI elements
+        # Temperature label
+        self.temperature_label = QLabel('Actual temperature: 20°C', self)
+        self.layout.addWidget(self.temperature_label)
+        
+        # Set transport button
+        self.transport_button = QPushButton('Set transport', self)
+        self.transport_button.setCheckable(True)
+        self.transport_button.clicked.connect(self.toggleTransport)
+        self.layout.addWidget(self.transport_button)
+        
+        # Cool down button
+        self.cool_down_button = QPushButton('Cool down', self)
+        self.cool_down_button.clicked.connect(lambda: self.startTemperatureChange(-1))
+        self.layout.addWidget(self.cool_down_button)
+        
+        # Warm up button
+        self.warm_up_button = QPushButton('Warm up', self)
+        self.warm_up_button.clicked.connect(lambda: self.startTemperatureChange(1))
+        self.layout.addWidget(self.warm_up_button)
+        
+        # Increase the vertical size of the buttons
+        self.transport_button.setFixedHeight(40)
+        self.cool_down_button.setFixedHeight(40)
+        self.warm_up_button.setFixedHeight(40)
+        
+        # Temperature variable and timer setup
+        self.temperature = 20
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.updateTemperature)
+    def toggleTransport(self):
+        if self.transport_button.isChecked():
+            self.transport_button.setStyleSheet("background-color: green; border-radius: 5px;")
+            self.cool_down_button.setEnabled(False)
+            self.warm_up_button.setEnabled(False)
         else:
-            new_temperature = current_temperature + 1
-
-        self.temperature_label.setText(str(new_temperature))
-
-        if new_temperature == 24:
+            self.transport_button.setStyleSheet("")
+            self.cool_down_button.setEnabled(True)
+            self.warm_up_button.setEnabled(True)
+            self.timer.stop()  # Stop temperature change if transport is unset
+        
+    def startTemperatureChange(self, direction):
+        if not self.transport_button.isChecked():
+            self.direction = direction
+            if not self.timer.isActive():
+                self.timer.start(100)  # Update temperature every 100 ms
+        
+    def updateTemperature(self):
+        self.temperature += self.direction * 0.1  # Change the temperature by 0.1°C
+        self.temperature_label.setText(f'Actual temperature: {self.temperature:.1f}°C')
+        
+        # Stopping condition if temperature goes out of bounds
+        if (self.direction == -1 and self.temperature <= -4) or (self.direction == 1 and self.temperature >= 20):
             self.timer.stop()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ui = UI()
-
-    def cool_down():
-        current_temperature = int(ui.temperature_label.text())
-        new_temperature = current_temperature - 1
-        ui.temperature_label.setText(str(new_temperature))
-
-    def warm_up():
-        current_temperature = int(ui.temperature_label.text())
-        new_temperature = current_temperature + 1
-        ui.temperature_label.setText(str(new_temperature))
-
-    ui.button1.clicked.connect(cool_down)
-    ui.button2.clicked.connect(warm_up)
-
+    ex = TemperatureControlGUI()
+    ex.show()
     sys.exit(app.exec_())
-    
-
-    
