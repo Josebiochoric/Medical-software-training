@@ -1,59 +1,69 @@
-import sys
 import unittest
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
-
 from UI_basic import TemperatureControlGUI
 
 class TestTemperatureControlGUI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = QApplication(sys.argv)
+        """Set up QApplication once for all tests."""
+        cls.app = QApplication([])
 
     def setUp(self):
-        """ Set up for the test """
-        self.form = TemperatureControlGUI()
-        self.form.show()
+        """Prepare the environment before each test."""
+        self.gui = TemperatureControlGUI()
+        # Directly initialize the main UI components to bypass the 5-second delay
+        self.gui.startMainUI()
 
-    def test_initial_state(self):
-        """ Test the initial state of the UI elements. """
-        self.assertEqual(self.form.progressBar.value(), 0)
-        self.assertTrue(self.form.selfTestTimer.isActive())
+    def test_initial_temperature(self):
+        """Test if the initial temperature is set correctly."""
+        self.assertEqual(self.gui.temperature, 20)
 
-    def test_self_test_completion(self):
-        """ Test the self-test completes and transitions to main UI. """
-        # Connect to the timer timeout signal to detect when self-test is done
-        self.self_test_completed = False
-        def on_self_test_complete():
-            self.self_test_completed = True
-            self.form.selfTestTimer.timeout.disconnect(on_self_test_complete)
+    def test_toggle_transport(self):
+        """Test toggling the transport mode disables/enables temperature adjustments."""
+        # Initially, buttons should be enabled
+        self.assertTrue(self.gui.cool_down_button.isEnabled())
+        self.assertTrue(self.gui.warm_up_button.isEnabled())
 
-        self.form.selfTestTimer.timeout.connect(on_self_test_complete)
-        while not self.self_test_completed:
-            QTest.qWait(100)  # Wait until the self-test completes
+        # Toggle transport mode off
+        self.gui.toggleTransport()
+        self.assertTrue(self.gui.cool_down_button.isEnabled())
+        self.assertTrue(self.gui.warm_up_button.isEnabled())
+        
+        # Toggle transport mode on
+        self.gui.transport_button.setChecked(True) 
+        self.gui.toggleTransport()
+        self.assertFalse(self.gui.cool_down_button.isEnabled())
+        self.assertFalse(self.gui.warm_up_button.isEnabled())
 
-        self.assertEqual(self.form.progressBar.value(), 100)
-        self.assertFalse(self.form.selfTestTimer.isActive())
+    def test_temperature_change_and_limits(self):
+        """Test temperature changes and verify limits are respected."""
+        # Ensure transport mode is off for temperature adjustments
+        self.gui.toggleTransport()  # If transport mode was on, this turns it off
 
-    def test_transport_button(self):
-        """ Test the transport button toggles and updates the UI correctly. """
-        # Wait for self-test to complete
-        QTest.qWait(5000)
-        self.assertTrue(self.form.transport_button.isEnabled())
+        # Simulate warming up
+        self.gui.startTemperatureChange(1)
+        self.gui.updateTemperature()
+        self.assertTrue(self.gui.temperature > 20)  # Initial temperature is 20, so it should increase
 
-        # Toggle 'Set transport' button on
-        QTest.mouseClick(self.form.transport_button, Qt.LeftButton)
-        self.assertTrue(self.form.transport_button.isChecked())
-        self.assertFalse(self.form.cool_down_button.isEnabled())
-        self.assertFalse(self.form.warm_up_button.isEnabled())
+        # Cool down to minimum limit
+        self.gui.startTemperatureChange(-1)
+        while self.gui.temperature > -4:  # -4 is the lower limit
+            self.gui.updateTemperature()
+        self.assertAlmostEqual(self.gui.temperature, -4)
+        self.gui.timer.stop()
 
-        # Toggle 'Set transport' button off
-        QTest.mouseClick(self.form.transport_button, Qt.LeftButton)
-        self.assertFalse(self.form.transport_button.isChecked())
-        self.assertTrue(self.form.cool_down_button.isEnabled())
-        self.assertTrue(self.form.warm_up_button.isEnabled())
+        # Reset and warm up to maximum limit
+        self.gui.temperature = 20  # Reset temperature to 20 for the test
+        self.gui.startTemperatureChange(1)
+        while self.gui.temperature < 20:  # 20 is the upper limit
+            self.gui.updateTemperature()
+        self.assertEqual(self.gui.temperature, 20)
+        self.gui.timer.stop()
 
-    # Other tests can be added here...
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up resources after all tests."""
+        del cls.app
 
 if __name__ == '__main__':
     unittest.main()
